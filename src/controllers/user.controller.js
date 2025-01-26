@@ -4,6 +4,7 @@ import {User} from "../models/user.model.js"
 import {uploadOnCloudinary} from "../utils/cloudinary.js"
 import {ApiResponse} from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose"
 
 const generateAccessAndRefereshTokens = async(userId) =>{
     try {
@@ -219,12 +220,15 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
 })
 
 const changeCurrentPassword = asyncHandler(async(req, res) => {
-    const {oldPassword, newPassword} = req.body
+    const {oldPassword, newPassword} = req.body;
 
+    // console.log(req.body);
+    // console.log(oldPassword);
+    // console.log(newPassword);
     const user = await User.findById(req.user?._id)
     const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
 
-    if(!isPasswordCorrect){
+    if (!isPasswordCorrect) {
         throw new ApiError(400, "Invalid old password")
     }
 
@@ -271,14 +275,14 @@ const updateUserAvatar = asyncHandler(async(req,res) => {
     if(!avatarLocalPath){
         throw new ApiError(400, "Avatar file is missing")
     }
-
+    //TODO: delete old image - assignment
     const avatar = await uploadOnCloudinary(avatarLocalPath)
 
     if(!avatar.url){
         throw new ApiError(400, "Error while uploading on avatar")
     }
 
-    const user = User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
             $set: {
@@ -326,13 +330,14 @@ const updateUserCoverImage = asyncHandler(async(req,res) => {
     
 })
 
-const getUserChannelProfile = asyncHandler(async(req,res) => {
+const getUserChannelProfile = asyncHandler(async(req, res) => {
     const {username} = req.params
 
-    if(!username?.trim()){
+
+    if (!username?.trim()) {
         throw new ApiError(400, "username is missing")
     }
-
+    
     const channel = await User.aggregate([
         {
             $match: {
@@ -340,29 +345,14 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
             }
         },
         {
-            // Performs  a left join b/w the User collection and subscriptions collection
-            // to get the users who have subscribed to this channel 
-            
-            // creates a new array field subscribers in the resulting document
-            // which contains all the documents from the subscriptions collection where
-            // matches the user's _id.
-
-            // It will be used to count the no of subscribers of a User's channel
             $lookup: {
-                from: "subcriptions",
-                localField: "_id", 
-                foreignField: "channel", 
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
                 as: "subscribers"
             }
-        }, 
+        },
         {
-            // Performs another left join b/w the User collection and the subscriptions 
-            // collection to get the channels that the user has subscribed to.
-
-            // creates a new array field subscribedTo in the resulting document, which
-            // contains all the documents from the subscriptions collection where
-            // the subscriber matches the user's _id.
-
             $lookup: {
                 from: "subscriptions",
                 localField: "_id",
@@ -371,15 +361,11 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
             }
         },
         {
-            // Adds new fields that contain the count of subscribers and the count of 
-            // channels the user has subscribed to.
-
-
             $addFields: {
                 subscribersCount: {
                     $size: "$subscribers"
                 },
-                channelsSubscribedToCount:{
+                channelsSubscribedToCount: {
                     $size: "$subscribedTo"
                 },
                 isSubscribed: {
@@ -387,14 +373,13 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
                         if: {$in: [req.user?._id, "$subscribers.subscriber"]},
                         then: true,
                         else: false
-
                     }
                 }
             }
         },
         {
             $project: {
-                fullName: 1, 
+                fullName: 1,
                 username: 1,
                 subscribersCount: 1,
                 channelsSubscribedToCount: 1,
@@ -402,18 +387,26 @@ const getUserChannelProfile = asyncHandler(async(req,res) => {
                 avatar: 1,
                 coverImage: 1,
                 email: 1
+
             }
         }
-
-
     ])
+
+    if (!channel?.length) {
+        throw new ApiError(404, "channel does not exists")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, channel[0], "User channel fetched successfully")
+    )
 })
 
 const getWatchHistory = asyncHandler(async(req, res) => {
     const user = await User.aggregate([
         {
             $match: {
-                // user id
                 _id: new mongoose.Types.ObjectId(req.user._id)
             }
         }, 
