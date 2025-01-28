@@ -236,7 +236,7 @@ const getAllVideo = asyncHandler(async(req, res) => {
     })
 })
 
-const deleteVideo = asyncHandler(async(req,res) => {
+const deleteAVideo = asyncHandler(async(req,res) => {
     // Extract the videoId from the request paramters
     const {videoId} = req.params
 
@@ -247,13 +247,76 @@ const deleteVideo = asyncHandler(async(req,res) => {
 
     // Find the video in the database using the videoId. If the video is not found then return error
 
-    const video = await Video.findById(videoId)({
-        _id: video
+    const video = await Video.findById({
+        _id: videoId,
     })
+    
+    if(!video){
+        throw new ApiError(404, "Video or file not found!!")
+    }
+    // Check if the owner of the video matches the user making the request. If they don't match, throw an error.
+
+    // if(video.owner.toString() !== req.user._id.toString()){
+    //     throw new ApiError(400, "you do not have the permission to delete video or file!!")
+    // }
+
+    if(video?.videoFile){
+        await deleteOnCloudinary(video?.videoFile?.public_id, "video")
+    }
+
+    if(video?.thumbnail){
+       deleteOnCloudinary(video?.thumbnail?.public_id, "any")
+    }
+
+    const deleteResponse = await Video.findByIdAndDelete(videoId)
+
+    if(!deleteResponse){
+        throw new ApiError(400, "Something went wrong while deleting file or video!!")
+    }
+
+    return res
+    .status(201)
+    .json(
+        new ApiResponse(200, deleteResponse, "video or file delete successfully")
+    )
+})
+
+const togglePublishStatus = asyncHandler(async (req,res) => {
+    const {videoId} = req.params
+
+    if(!isValidObjectId(videoId)){
+        throw new ApiError(400, "this video is not valid!!")
+    }
+
+    // find video in db
+
+    const video = await Video.findById({
+        _id: videoId,
+    })
+
+    if(!video){
+        throw new ApiError(404, "video is not found!!")
+    }
+
+    // if(video?.owner?.toString() !== req.user._id?.toString()){
+    //     throw new ApiError(400, "You don't have permission to toggle this video!!")
+    // }
+
+    // toggle video status
+
+    video.isPublished = !video.isPublished
+
+    await video.save({validateBeforeSave: false})
+
+    return res
+    .status(201)
+    .json(new ApiResponse(200, video, "toggle video successfully:)"))
 })
 export {
     publishAVideo,
     updateVideo,
     getVideoById,
-    getAllVideo
+    getAllVideo,
+    deleteAVideo, 
+    togglePublishStatus
 }
