@@ -12,6 +12,7 @@ const uploadOnCloudinary = async (localFilePath) => {
         if(!localFilePath) return null
         // upload the file on cloudinary 
         const response = await cloudinary.uploader.upload(localFilePath, {
+            folder: "VideoTube",
             resource_type: "auto"
         })
 
