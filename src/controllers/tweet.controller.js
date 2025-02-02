@@ -20,13 +20,12 @@ const createTweet = asyncHandler(async(req, res) => {
     // creating tweet
     const tweet = await Tweet.create({
         content, 
-        ownwer: req.user._id
+        owner: req.user._id
     })
 
     if(!tweet){
         throw new ApiError(500, "Something went wrong while creating tweet")
     }
-
     return res
     .status(200)
     .json(new ApiResponse(200, tweet, "tweet created successfully!!!"))
@@ -60,7 +59,6 @@ const getUserTweets = asyncHandler(async(req,res) => {
     if(!tweets){
         throw new ApiError(500, "Something went wrong while fetching tweets")
     }
-
     return res
     .status(200)
     .json(new ApiResponse(200, tweets, "tweets fetched successfully"))
@@ -127,6 +125,14 @@ const deleteTweet = asyncHandler(async(req, res) => {
     }
 
     const deleteTweet = await Tweet.deleteOne({_id: tweetId})
+
+    if(!deleteTweet){
+        throw new ApiError(404, "Something went wrong while deleting this tweet!!")
+    }
+
+    return res
+    .status(201)
+    .json(new ApiResponse(200, deleteTweet, "Tweet delete successfully!!"))
 })
 export {
     createTweet, 
